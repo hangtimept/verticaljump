@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#050505">
+<title>VertiPro</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23050505'/%3E%3Cpath d='M28 72 L50 28 L72 72' stroke='%2300e5a0' stroke-width='11' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='50' cy='76' r='7' fill='%2300e5a0'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050505;
+    --card: #0c0c0c;
+    --border: #1c1c1c;
+    --text: #f2f2f2;
+    --muted: #7a7a7a;
+    --accent: #00e5a0;
+    --accent2: #00b4d8;
+    --danger: #ff4757;
+    --warning: #ffa502;
+    --flight: #7b61ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+  }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .app {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px 32px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .logo {
+    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: -0.6px;
+  }
+  .logo span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .status-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 11px;
+    border-radius: 20px;
+    background: #141414;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    letter-spacing: 0.3px;
+  }
+  .status-pill.live { background: rgba(0,229,160,0.12); color: var(--accent); border-color: rgba(0,229,160,0.3); }
+  .status-pill.recording { background: rgba(255,71,87,0.14); color: var(--danger); border-color: rgba(255,71,87,0.35); }
+  .status-pill.flight { background: rgba(123,97,255,0.18); color: #b8a9ff; border-color: rgba(123,97,255,0.4); }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 11px;
+    background: #141414;
+    border: 1px solid var(--border);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .hero {
+    background: linear-gradient(165deg, #121212 0%, #0a0a0a 100%);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 24px 18px 20px;
+    text-align: center;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -40%;
+    width: 180%; height: 180%;
+    background: radial-gradient(circle at 50% 25%, rgba(0,229,160,0.08) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  .hero-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    margin-bottom: 4px;
+  }
+  .height-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -2.5px;
+    background: linear-gradient(180deg, #fff 20%, #888);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .height-unit {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .phase-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-top: 8px;
+    height: 18px;
+  }
+  .velocity-sub {
+    display: flex;
+    justify-content: center;
+    gap: 26px;
+    margin-top: 14px;
+  }
+  .sub-item { text-align: center; }
+  .sub-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .sub-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 4px;
+    text-align: center;
+  }
+  .metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .metric-label {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+  }
+  .graph-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 8px;
+    margin-bottom: 12px;
+    height: 120px;
+    position: relative;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr 1fr;
+    gap: 9px;
+    margin-bottom: 10px;
+  }
+  button {
+    border: none;
+    border-radius: 15px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 14px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-secondary {
+    background: #161616;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #00c48a);
+    color: #000;
+    box-shadow: 0 4px 16px rgba(0,229,160,0.28);
+  }
+  .btn-primary.recording {
+    background: linear-gradient(135deg, var(--danger), #ff6b81);
+    box-shadow: 0 4px 16px rgba(255,71,87,0.32);
+  }
+  .btn-danger {
+    background: #161616;
+    color: var(--danger);
+    border: 1px solid rgba(255,71,87,0.28);
+  }
+  .secondary-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 7px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .jumps-list {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    max-height: 300px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .jump-row {
+    display: grid;
+    grid-template-columns: 26px 1fr 1fr 1fr 1fr 1fr 26px;
+    padding: 9px 7px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    align-items: center;
+    gap: 2px;
+  }
+  .jump-row:last-child { border-bottom: none; }
+  .jump-row.header {
+    background: #0a0a0a;
+    color: var(--muted);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .jump-num { font-weight: 700; color: var(--accent); }
+  .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+  .del-jump {
+    background: none; border: none;
+    color: var(--muted);
+    font-size: 15px;
+    padding: 0;
+    width: 24px; height: 24px;
+  }
+  .tips {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+    text-align: center;
+    padding: 0 4px 6px;
+  }
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.94);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px; z-index: 200;
+    text-align: center;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 { font-size: 22px; margin-bottom: 10px; }
+  .overlay p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 26px;
+    max-width: 290px;
+  }
+  .overlay button {
+    width: 100%; max-width: 270px;
+    padding: 16px; font-size: 15px;
+  }
+  .sheet-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 150;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-width: 430px; margin: 0 auto;
+    background: #0f0f0f;
+    border-radius: 24px 24px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    z-index: 160;
+    transform: translateY(110%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 90dvh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle {
+    width: 38px; height: 4px;
+    background: #333; border-radius: 4px;
+    margin: 10px auto 6px; flex-shrink: 0;
+  }
+  .sheet-content {
+    flex: 1; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 6px 20px 20px;
+  }
+  .sheet h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+  .setting-group { margin-bottom: 18px; }
+  .setting-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--muted); margin-bottom: 7px;
+    display: flex; justify-content: space-between;
+  }
+  .setting-value {
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none;
+    height: 5px; background: #222; border-radius: 4px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    background: var(--accent); border-radius: 50%;
+    cursor: pointer; box-shadow: 0 0 8px rgba(0,229,160,0.4);
+  }
+  .unit-row { display: flex; gap: 7px; margin-top: 6px; }
+  .unit-btn {
+    flex: 1; padding: 9px 4px; font-size: 12px; font-weight: 600;
+    border-radius: 11px; background: #161616; color: var(--muted);
+    border: 1px solid var(--border); text-align: center;
+  }
+  .unit-btn.active {
+    background: rgba(0,229,160,0.14);
+    color: var(--accent);
+    border-color: rgba(0,229,160,0.4);
+  }
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle {
+    width: 46px; height: 26px; background: #333;
+    border-radius: 20px; position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute;
+    width: 20px; height: 20px; background: #fff;
+    border-radius: 50%; top: 3px; left: 3px;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(20px); }
+  .sheet-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 9px;
+    padding: 11px 20px 22px;
+    background: #0f0f0f;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="logo">Verti<span>Pro</span></div>
+      <div class="header-right">
+        <div class="status-pill" id="statusPill">READY</div>
+        <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-label">Jump Height</div>
+      <div class="height-display" id="liveHeight">0.0</div>
+      <div class="height-unit" id="heightUnitLabel">cm</div>
+      <div class="phase-label" id="phaseLabel">Stand still • Ready</div>
+      <div class="velocity-sub">
+        <div class="sub-item">
+          <div class="sub-value" id="flightTime">0.00</div>
+          <div class="sub-label">Flight (s)</div>
+        </div>
+        <div class="sub-item">
+          <div class="sub-value" id="takeoffVel">0.00</div>
+          <div class="sub-label">Take-off</div>
+        </div>
+        <div class="sub-item">
+          <div class="sub-value" id="jumpCount">0</div>
+          <div class="sub-label">Jumps</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-value" id="setBest">—</div>
+        <div class="metric-label">Best</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="setAvg">—</div>
+        <div class="metric-label">Average</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="peakPower">—</div>
+        <div class="metric-label">Peak Pwr</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="consist">—</div>
+        <div class="metric-label">Consist %</div>
+      </div>
+    </div>
+
+    <div class="graph-container">
+      <canvas id="velocityChart"></canvas>
+    </div>
+
+    <div class="controls">
+      <button class="btn-secondary" id="zeroBtn">Zero</button>
+      <button class="btn-primary" id="recordBtn">Start Set</button>
+      <button class="btn-danger" id="resetBtn">Reset</button>
+    </div>
+    <div class="secondary-row">
+      <button class="btn-secondary" id="calibrateBtn">Calibrate</button>
+      <button class="btn-secondary" id="undoBtn">Undo Last</button>
+    </div>
+
+    <div class="section-title">
+      <span>Jump History</span>
+      <span id="setInfo">Set not started</span>
+    </div>
+    <div class="jumps-list" id="jumpsList">
+      <div class="jump-row header">
+        <div>#</div>
+        <div>Height</div>
+        <div>Flight</div>
+        <div>T-off</div>
+        <div>Pwr</div>
+        <div>Peak</div>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="tips">
+      Mount phone securely on torso or waist. Stand still → jump maximally → land softly. Set body mass in Settings for accurate power.
+    </div>
+  </div>
+
+  <div class="overlay" id="permissionOverlay">
+    <h2>Enable Motion Sensors</h2>
+    <p>VertiPro needs access to your device’s accelerometer and gyroscope to measure jump height from flight time and acceleration.</p>
+    <button class="btn-primary" id="enableMotionBtn">Enable Motion Access</button>
+  </div>
+
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="sheet" id="settingsSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <h3>Settings</h3>
+
+      <div class="setting-group">
+        <div class="setting-label">
+          <span>Body Mass (for power)</span>
+          <span class="setting-value" id="massVal">75 kg</span>
+        </div>
+        <input type="range" id="massSlider" min="30" max="150" step="1" value="75">
+        <div class="unit-row" id="massUnitRow" style="margin-top:8px">
+          <button class="unit-btn" data-unit="kg">kg</button>
+          <button class="unit-btn" data-unit="lb">lb</button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label"><span>Height Units</span></div>
+        <div class="unit-row" id="heightUnitRow">
+          <button class="unit-btn" data-unit="cm">cm</button>
+          <button class="unit-btn" data-unit="in">in</button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label"><span>Velocity Units</span></div>
+        <div class="unit-row" id="velUnitRow">
+          <button class="unit-btn" data-unit="m/s">m/s</button>
+          <button class="unit-btn" data-unit="ft/s">ft/s</button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">
+          <span>Min Flight Time (s)</span>
+          <span class="setting-value" id="minFlightVal">0.18</span>
+        </div>
+        <input type="range" id="minFlight" min="0.10" max="0.40" step="0.01" value="0.18">
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">
+          <span>Take-off Threshold (m/s²)</span>
+          <span class="setting-value" id="takeoffThreshVal">4.5</span>
+        </div>
+        <input type="range" id="takeoffThresh" min="2.0" max="8.0" step="0.1" value="4.5">
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">
+          <span>Landing Impact (m/s²)</span>
+          <span class="setting-value" id="landingThreshVal">12</span>
+        </div>
+        <input type="range" id="landingThresh" min="6" max="25" step="0.5" value="12">
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">
+          <span>Target Height (feedback)</span>
+          <span class="setting-value" id="targetHeightVal">40 cm</span>
+        </div>
+        <input type="range" id="targetHeight" min="15" max="90" step="1" value="40">
+      </div>
+
+      <div class="setting-group">
+        <div class="toggle-row">
+          <span>Haptic on landing</span>
+          <div class="toggle on" id="hapticToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Sound on jump complete</span>
+          <div class="toggle" id="soundToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Flash when below target</span>
+          <div class="toggle on" id="flashToggle"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="closeSettings">Close</button>
+      <button class="btn-primary" id="saveSettings">Save</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const defaultSettings = {
+    minFlight: 0.18,
+    takeoffThresh: 4.5,
+    landingThresh: 12,
+    targetHeightCm: 40,
+    haptic: true,
+    sound: false,
+    flashBelowTarget: true,
+    heightUnit: 'cm',
+    velUnit: 'm/s',
+    massValue: 75,
+    massUnit: 'kg'
+  };
+  let settings = { ...defaultSettings };
+  try {
+    const saved = localStorage.getItem('vertipro_settings');
+    if (saved) settings = { ...defaultSettings, ...JSON.parse(saved) };
+  } catch (e) {}
+
+  // Unit helpers
+  function toDisplayHeight(cm) {
+    return settings.heightUnit === 'in' ? cm / 2.54 : cm;
+  }
+  function formatHeight(cm, digits = 1) {
+    const v = toDisplayHeight(cm);
+    return settings.heightUnit === 'in' ? v.toFixed(1) : v.toFixed(1);
+  }
+  function toDisplayVel(ms) {
+    return settings.velUnit === 'ft/s' ? ms * 3.28084 : ms;
+  }
+  function formatVel(ms, digits = 2) {
+    return toDisplayVel(ms).toFixed(digits);
+  }
+  function getMassKg() {
+    return settings.massUnit === 'lb' ? settings.massValue * 0.453592 : settings.massValue;
+  }
+  function updateUnitLabels() {
+    $('heightUnitLabel').textContent = settings.heightUnit;
+  }
+
+  // State
+  let isRecording = false;
+  let permissionGranted = false;
+  let gravity = { x: 0, y: 0, z: 9.81 };
+  let velocity = 0;          // vertical velocity (m/s), positive = up
+  let lastTimestamp = null;
+  let lastAccel = 0;
+  let stationarySamples = 0;
+  const velHistory = [];
+  const HISTORY_LEN = 12;
+
+  // Jump state machine
+  let phase = 'idle';        // idle | concentric | flight | landing
+  let flightStart = 0;
+  let takeoffVelocity = 0;
+  let peakVelInJump = 0;
+  let currentJump = null;
+  let jumps = [];
+  let lastLandingTime = 0;
+  const COOLDOWN_MS = 600;
+
+  const chartData = [];
+  const MAX_POINTS = 130;
+  let chartCtx = null;
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- Permission ----------
+  function requestMotionPermission() {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then(r => {
+          if (r === 'granted') {
+            permissionGranted = true;
+            $('permissionOverlay').classList.add('hidden');
+            window.addEventListener('devicemotion', onMotion, { passive: true });
+          } else alert('Motion permission is required.');
+        }).catch(console.error);
+    } else {
+      permissionGranted = true;
+      $('permissionOverlay').classList.add('hidden');
+      window.addEventListener('devicemotion', onMotion, { passive: true });
+    }
+  }
+
+  // ---------- Sensor processing ----------
+  function onMotion(e) {
+    if (!e.accelerationIncludingGravity) return;
+    const now = e.timeStamp || performance.now();
+    const aig = e.accelerationIncludingGravity;
+
+    let linX = 0, linY = 0, linZ = 0;
+    if (e.acceleration && e.acceleration.x !== null) {
+      linX = e.acceleration.x || 0;
+      linY = e.acceleration.y || 0;
+      linZ = e.acceleration.z || 0;
+    } else {
+      const a = 0.90;
+      gravity.x = a * gravity.x + (1 - a) * (aig.x || 0);
+      gravity.y = a * gravity.y + (1 - a) * (aig.y || 0);
+      gravity.z = a * gravity.z + (1 - a) * (aig.z || 0);
+      linX = (aig.x || 0) - gravity.x;
+      linY = (aig.y || 0) - gravity.y;
+      linZ = (aig.z || 0) - gravity.z;
+    }
+
+    // Vertical component (opposite to gravity vector)
+    const gMag = Math.hypot(gravity.x, gravity.y, gravity.z) || 9.81;
+    const gx = gravity.x / gMag, gy = gravity.y / gMag, gz = gravity.z / gMag;
+    // Positive = upward acceleration relative to gravity
+    const accel = -(linX * gx + linY * gy + linZ * gz);
+
+    processSample(accel, now, Math.hypot(linX, linY, linZ));
+  }
+
+  function processSample(rawAccel, timestamp, totalLinAccel) {
+    if (!lastTimestamp) { lastTimestamp = timestamp; return; }
+    let dt = (timestamp - lastTimestamp) / 1000;
+    if (dt <= 0 || dt > 0.06) dt = 0.016;
+    lastTimestamp = timestamp;
+
+    // Light smoothing
+    const accel = 0.55 * lastAccel + 0.45 * rawAccel;
+    lastAccel = accel;
+
+    // Integrate velocity (positive up)
+    velocity += accel * dt;
+
+    // Zeroing when stationary
+    velHistory.push(velocity);
+    if (velHistory.length > HISTORY_LEN) velHistory.shift();
+    let isFlat = false;
+    if (velHistory.length >= HISTORY_LEN) {
+      const mean = velHistory.reduce((a, b) => a + b, 0) / velHistory.length;
+      let variance = 0;
+      for (const v of velHistory) variance += (v - mean) * (v - mean);
+      const std = Math.sqrt(variance / velHistory.length);
+      isFlat = std < 0.025;
+    }
+    const isStationary = (Math.abs(velocity) < 0.08 && Math.abs(accel) < 0.6) ||
+                         (isFlat && Math.abs(accel) < 0.8);
+    if (isStationary) {
+      stationarySamples++;
+      if (stationarySamples >= 5) {
+        velocity *= 0.65;
+        if (Math.abs(velocity) < 0.03) velocity = 0;
+      }
+    } else stationarySamples = 0;
+
+    // Live velocity display helper
+    const absV = Math.abs(velocity);
+
+    // Chart
+    chartData.push(velocity);
+    if (chartData.length > MAX_POINTS) chartData.shift();
+    drawChart();
+
+    if (!isRecording) {
+      $('phaseLabel').textContent = 'Stand still • Ready';
+      return;
+    }
+
+    // ========== JUMP STATE MACHINE ==========
+    if (phase === 'idle') {
+      // Detect strong upward acceleration (take-off impulse)
+      if (accel > settings.takeoffThresh && (timestamp - lastLandingTime > COOLDOWN_MS)) {
+        phase = 'concentric';
+        currentJump = {
+          startTime: timestamp,
+          peakAccel: accel,
+          takeoffVel: 0,
+          peakVel: 0
+        };
+        $('phaseLabel').textContent = 'Pushing…';
+        $('statusPill').textContent = 'TAKE-OFF';
+        $('statusPill').className = 'status-pill live';
+      }
+    }
+    else if (phase === 'concentric') {
+      if (velocity > currentJump.peakVel) currentJump.peakVel = velocity;
+      // Transition to flight when acceleration drops near free-fall
+      if (accel < 1.5 && velocity > 0.4) {
+        phase = 'flight';
+        flightStart = timestamp;
+        takeoffVelocity = Math.max(0.1, velocity);
+        peakVelInJump = takeoffVelocity;
+        currentJump.takeoffVel = takeoffVelocity;
+        $('phaseLabel').textContent = 'In flight…';
+        $('statusPill').textContent = 'FLIGHT';
+        $('statusPill').className = 'status-pill flight';
+        $('takeoffVel').textContent = formatVel(takeoffVelocity);
+      }
+      // Safety: if we never leave the ground, abort after 1.2 s
+      if (timestamp - currentJump.startTime > 1200) {
+        phase = 'idle';
+        currentJump = null;
+        forceZero();
+      }
+    }
+    else if (phase === 'flight') {
+      const flightMs = timestamp - flightStart;
+      $('flightTime').textContent = (flightMs / 1000).toFixed(2);
+
+      // Live height estimate from flight time so far (optimistic)
+      const liveH = 0.5 * 9.81 * Math.pow(flightMs / 2000, 2) * 100; // rough
+      $('liveHeight').textContent = formatHeight(liveH);
+
+      if (velocity > peakVelInJump) peakVelInJump = velocity;
+
+      // Landing detection: large downward impact or high total linear accel
+      if (accel < -settings.landingThresh || totalLinAccel > settings.landingThresh * 1.4) {
+        const flightTime = (timestamp - flightStart) / 1000;
+        if (flightTime >= settings.minFlight) {
+          // Classic flight-time height formula (m → cm)
+          // h = (g * t²) / 8
+          const heightCm = (9.81 * flightTime * flightTime) / 8 * 100;
+
+          const mass = getMassKg();
+          // Approximate peak power (W) from take-off velocity
+          // P ≈ m * g * v_takeoff  (simplified) or better from energy
+          const peakPower = mass * 9.81 * takeoffVelocity * 1.15; // rough scaling
+          const meanPower = mass * 9.81 * (heightCm / 100) / (flightTime * 0.5);
+
+          const jump = {
+            number: jumps.length + 1,
+            height: heightCm,
+            flightTime,
+            takeoffVel: takeoffVelocity,
+            peakVel: peakVelInJump,
+            peakPower,
+            meanPower
+          };
+          jumps.push(jump);
+          onJumpComplete(jump);
+        }
+        phase = 'landing';
+        lastLandingTime = timestamp;
+        $('phaseLabel').textContent = 'Landed';
+        setTimeout(() => {
+          if (phase === 'landing') {
+            phase = 'idle';
+            forceZero();
+            $('phaseLabel').textContent = isRecording ? 'Ready for next jump' : 'Stand still • Ready';
+            if (isRecording) {
+              $('statusPill').textContent = 'RECORDING';
+              $('statusPill').className = 'status-pill recording';
+            }
+          }
+        }, 350);
+      }
+
+      // Safety timeout (max reasonable flight ~1.1 s)
+      if (flightMs > 1100) {
+        phase = 'idle';
+        currentJump = null;
+        forceZero();
+        $('phaseLabel').textContent = 'Ready for next jump';
+      }
+    }
+  }
+
+  function onJumpComplete(jump) {
+    updateUI();
+    if (settings.haptic && navigator.vibrate) navigator.vibrate([30, 40, 30]);
+    if (settings.sound) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 990;
+        gain.gain.value = 0.07;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+        osc.stop(ctx.currentTime + 0.14);
+      } catch (e) {}
+    }
+    // Flash feedback
+    if (settings.flashBelowTarget) {
+      const hero = document.querySelector('.hero');
+      if (jump.height < settings.targetHeightCm) {
+        hero.style.borderColor = 'rgba(255,165,2,0.55)';
+        setTimeout(() => hero.style.borderColor = '', 700);
+      } else {
+        hero.style.borderColor = 'rgba(0,229,160,0.5)';
+        setTimeout(() => hero.style.borderColor = '', 700);
+      }
+    }
+  }
+
+  function forceZero() {
+    velocity = 0;
+    lastAccel = 0;
+    stationarySamples = 15;
+    velHistory.length = 0;
+    if (navigator.vibrate) navigator.vibrate(18);
+  }
+
+  function updateUI() {
+    $('jumpCount').textContent = jumps.length;
+
+    if (jumps.length === 0) {
+      $('setBest').textContent = '—';
+      $('setAvg').textContent = '—';
+      $('peakPower').textContent = '—';
+      $('consist').textContent = '—';
+      $('setInfo').textContent = isRecording ? 'Waiting for first jump…' : 'Set not started';
+      $('liveHeight').textContent = formatHeight(0);
+      $('flightTime').textContent = '0.00';
+      $('takeoffVel').textContent = formatVel(0);
+      return;
+    }
+
+    const heights = jumps.map(j => j.height);
+    const best = Math.max(...heights);
+    const avg = heights.reduce((a, b) => a + b, 0) / heights.length;
+    const last = jumps[jumps.length - 1];
+
+    $('setBest').textContent = formatHeight(best);
+    $('setAvg').textContent = formatHeight(avg);
+    $('peakPower').textContent = Math.round(last.peakPower);
+    $('liveHeight').textContent = formatHeight(last.height);
+    $('flightTime').textContent = last.flightTime.toFixed(2);
+    $('takeoffVel').textContent = formatVel(last.takeoffVel);
+
+    // Consistency (1 - CV)
+    const meanH = avg;
+    let std = 0;
+    heights.forEach(h => std += (h - meanH) ** 2);
+    std = Math.sqrt(std / heights.length);
+    const consistency = meanH > 0 ? Math.max(0, (1 - std / meanH) * 100) : 0;
+    $('consist').textContent = consistency.toFixed(0) + '%';
+
+    $('setInfo').textContent = `${jumps.length} jump${jumps.length > 1 ? 's' : ''} recorded`;
+
+    // Rebuild list
+    const list = $('jumpsList');
+    const header = list.querySelector('.header');
+    list.innerHTML = '';
+    list.appendChild(header);
+    [...jumps].reverse().forEach((j, idx) => {
+      const realIndex = jumps.length - 1 - idx;
+      const row = document.createElement('div');
+      row.className = 'jump-row';
+      row.innerHTML = `
+        <div class="jump-num">${j.number}</div>
+        <div class="mono">${formatHeight(j.height)}</div>
+        <div class="mono">${j.flightTime.toFixed(2)}</div>
+        <div class="mono">${formatVel(j.takeoffVel)}</div>
+        <div class="mono">${Math.round(j.peakPower)}</div>
+        <div class="mono">${formatVel(j.peakVel)}</div>
+        <button class="del-jump" data-idx="${realIndex}">×</button>
+      `;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.del-jump').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        jumps.splice(i, 1);
+        jumps.forEach((j, n) => j.number = n + 1);
+        updateUI();
+      });
+    });
+  }
+
+  function drawChart() {
+    const canvas = $('velocityChart');
+    if (!chartCtx) {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * devicePixelRatio;
+      canvas.height = rect.height * devicePixelRatio;
+      chartCtx = canvas.getContext('2d');
+      chartCtx.scale(devicePixelRatio, devicePixelRatio);
+    }
+    const w = canvas.width / devicePixelRatio;
+    const h = canvas.height / devicePixelRatio;
+    chartCtx.clearRect(0, 0, w, h);
+
+    // Zero line
+    chartCtx.strokeStyle = '#1a1a1a';
+    chartCtx.lineWidth = 1;
+    chartCtx.beginPath();
+    chartCtx.moveTo(0, h / 2);
+    chartCtx.lineTo(w, h / 2);
+    chartCtx.stroke();
+
+    if (chartData.length < 2) return;
+    const maxAbs = Math.max(1.2, ...chartData.map(Math.abs));
+    const scale = (h * 0.38) / maxAbs;
+
+    chartCtx.beginPath();
+    chartCtx.strokeStyle = '#00e5a0';
+    chartCtx.lineWidth = 2.1;
+    chartCtx.lineJoin = 'round';
+    chartData.forEach((v, i) => {
+      const x = (i / (MAX_POINTS - 1)) * w;
+      const y = h / 2 - v * scale;
+      if (i === 0) chartCtx.moveTo(x, y);
+      else chartCtx.lineTo(x, y);
+    });
+    chartCtx.stroke();
+  }
+
+  // ---------- Controls ----------
+  $('enableMotionBtn').addEventListener('click', requestMotionPermission);
+
+  $('zeroBtn').addEventListener('click', () => {
+    forceZero();
+    $('liveHeight').textContent = formatHeight(0);
+  });
+
+  $('calibrateBtn').addEventListener('click', () => {
+    gravity = { x: 0, y: 0, z: 9.81 };
+    forceZero();
+    $('statusPill').textContent = 'CALIBRATED';
+    $('statusPill').className = 'status-pill live';
+    if (navigator.vibrate) navigator.vibrate([18, 35, 18]);
+  });
+
+  $('recordBtn').addEventListener('click', () => {
+    if (!permissionGranted) { requestMotionPermission(); return; }
+    isRecording = !isRecording;
+    if (isRecording) {
+      jumps = [];
+      phase = 'idle';
+      currentJump = null;
+      lastLandingTime = 0;
+      forceZero();
+      updateUI();
+      $('recordBtn').textContent = 'Stop Set';
+      $('recordBtn').classList.add('recording');
+      $('statusPill').textContent = 'RECORDING';
+      $('statusPill').className = 'status-pill recording';
+      $('phaseLabel').textContent = 'Ready for first jump';
+    } else {
+      $('recordBtn').textContent = 'Start Set';
+      $('recordBtn').classList.remove('recording');
+      $('statusPill').textContent = 'READY';
+      $('statusPill').className = 'status-pill';
+      $('phaseLabel').textContent = 'Stand still • Ready';
+      document.querySelector('.hero').style.borderColor = '';
+    }
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    isRecording = false;
+    jumps = [];
+    phase = 'idle';
+    currentJump = null;
+    lastLandingTime = 0;
+    forceZero();
+    chartData.length = 0;
+    updateUI();
+    $('liveHeight').textContent = formatHeight(0);
+    $('recordBtn').textContent = 'Start Set';
+    $('recordBtn').classList.remove('recording');
+    $('statusPill').textContent = 'READY';
+    $('statusPill').className = 'status-pill';
+    $('phaseLabel').textContent = 'Stand still • Ready';
+    document.querySelector('.hero').style.borderColor = '';
+  });
+
+  $('undoBtn').addEventListener('click', () => {
+    if (jumps.length === 0) return;
+    jumps.pop();
+    jumps.forEach((j, i) => j.number = i + 1);
+    updateUI();
+  });
+
+  // ---------- Settings ----------
+  function openSettings() {
+    $('massSlider').value = settings.massValue;
+    $('massVal').textContent = settings.massValue + ' ' + settings.massUnit;
+    $('minFlight').value = settings.minFlight;
+    $('minFlightVal').textContent = settings.minFlight.toFixed(2);
+    $('takeoffThresh').value = settings.takeoffThresh;
+    $('takeoffThreshVal').textContent = settings.takeoffThresh.toFixed(1);
+    $('landingThresh').value = settings.landingThresh;
+    $('landingThreshVal').textContent = settings.landingThresh;
+    $('targetHeight').value = settings.targetHeightCm;
+    $('targetHeightVal').textContent = settings.targetHeightCm + ' cm';
+    $('hapticToggle').classList.toggle('on', settings.haptic);
+    $('soundToggle').classList.toggle('on', settings.sound);
+    $('flashToggle').classList.toggle('on', settings.flashBelowTarget);
+
+    document.querySelectorAll('#heightUnitRow .unit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.unit === settings.heightUnit);
+    });
+    document.querySelectorAll('#velUnitRow .unit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.unit === settings.velUnit);
+    });
+    document.querySelectorAll('#massUnitRow .unit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.unit === settings.massUnit);
+    });
+
+    $('sheetBackdrop').classList.add('open');
+    $('settingsSheet').classList.add('open');
+  }
+  function closeSettings() {
+    $('sheetBackdrop').classList.remove('open');
+    $('settingsSheet').classList.remove('open');
+  }
+
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('sheetBackdrop').addEventListener('click', closeSettings);
+  $('closeSettings').addEventListener('click', closeSettings);
+
+  $('massSlider').addEventListener('input', e => {
+    const unit = document.querySelector('#massUnitRow .unit-btn.active')?.dataset.unit || settings.massUnit;
+    $('massVal').textContent = e.target.value + ' ' + unit;
+  });
+  $('minFlight').addEventListener('input', e => $('minFlightVal').textContent = parseFloat(e.target.value).toFixed(2));
+  $('takeoffThresh').addEventListener('input', e => $('takeoffThreshVal').textContent = parseFloat(e.target.value).toFixed(1));
+  $('landingThresh').addEventListener('input', e => $('landingThreshVal').textContent = e.target.value);
+  $('targetHeight').addEventListener('input', e => $('targetHeightVal').textContent = e.target.value + ' cm');
+
+  document.querySelectorAll('#heightUnitRow .unit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#heightUnitRow .unit-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  document.querySelectorAll('#velUnitRow .unit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#velUnitRow .unit-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  document.querySelectorAll('#massUnitRow .unit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#massUnitRow .unit-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      $('massVal').textContent = $('massSlider').value + ' ' + btn.dataset.unit;
+    });
+  });
+
+  ['hapticToggle', 'soundToggle', 'flashToggle'].forEach(id => {
+    $(id).addEventListener('click', () => $(id).classList.toggle('on'));
+  });
+
+  $('saveSettings').addEventListener('click', () => {
+    settings.minFlight = parseFloat($('minFlight').value);
+    settings.takeoffThresh = parseFloat($('takeoffThresh').value);
+    settings.landingThresh = parseFloat($('landingThresh').value);
+    settings.targetHeightCm = parseInt($('targetHeight').value);
+    settings.massValue = parseInt($('massSlider').value);
+    settings.haptic = $('hapticToggle').classList.contains('on');
+    settings.sound = $('soundToggle').classList.contains('on');
+    settings.flashBelowTarget = $('flashToggle').classList.contains('on');
+
+    const activeH = document.querySelector('#heightUnitRow .unit-btn.active');
+    const activeV = document.querySelector('#velUnitRow .unit-btn.active');
+    const activeM = document.querySelector('#massUnitRow .unit-btn.active');
+    if (activeH) settings.heightUnit = activeH.dataset.unit;
+    if (activeV) settings.velUnit = activeV.dataset.unit;
+    if (activeM) settings.massUnit = activeM.dataset.unit;
+
+    localStorage.setItem('vertipro_settings', JSON.stringify(settings));
+    updateUnitLabels();
+    updateUI();
+    closeSettings();
+    if (navigator.vibrate) navigator.vibrate(28);
+  });
+
+  // Touch handling – allow scrolling on sheet & list
+  document.body.addEventListener('touchmove', e => {
+    if (e.target.closest('.sheet') || e.target.closest('.jumps-list') || e.target.closest('.sheet-content')) return;
+    if (e.target.closest('.hero') || e.target.closest('.controls') || e.target.closest('.metrics')) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  updateUnitLabels();
+  window.addEventListener('load', () => setTimeout(drawChart, 120));
+  window.addEventListener('resize', () => { chartCtx = null; drawChart(); });
+})();
+</script>
+</body>
+</html>
