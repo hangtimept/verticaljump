@@ -479,19 +479,19 @@
         <div>Flight</div>
         <div>T-off</div>
         <div>Pwr</div>
-        <div>Peak</div>
+        <div>v²/2g</div>
         <div></div>
       </div>
     </div>
 
     <div class="tips">
-      Mount phone securely on torso or waist. Stand still → jump maximally → land softly. Set body mass in Settings for accurate power.
+      Mount phone firmly on torso or waist. Stand still → jump maximally → land softly. Set body mass for power. If heights are still off, lower the Landing threshold in Settings.
     </div>
   </div>
 
   <div class="overlay" id="permissionOverlay">
     <h2>Enable Motion Sensors</h2>
-    <p>VertiPro needs access to your device’s accelerometer and gyroscope to measure jump height from flight time and acceleration.</p>
+    <p>VertiPro needs access to your device’s accelerometer and gyroscope to measure jump height from flight time.</p>
     <button class="btn-primary" id="enableMotionBtn">Enable Motion Access</button>
   </div>
 
@@ -532,25 +532,25 @@
       <div class="setting-group">
         <div class="setting-label">
           <span>Min Flight Time (s)</span>
-          <span class="setting-value" id="minFlightVal">0.18</span>
+          <span class="setting-value" id="minFlightVal">0.20</span>
         </div>
-        <input type="range" id="minFlight" min="0.10" max="0.40" step="0.01" value="0.18">
+        <input type="range" id="minFlight" min="0.12" max="0.40" step="0.01" value="0.20">
       </div>
 
       <div class="setting-group">
         <div class="setting-label">
-          <span>Take-off Threshold (m/s²)</span>
-          <span class="setting-value" id="takeoffThreshVal">4.5</span>
+          <span>Free-fall Threshold (m/s²)</span>
+          <span class="setting-value" id="freefallVal">2.8</span>
         </div>
-        <input type="range" id="takeoffThresh" min="2.0" max="8.0" step="0.1" value="4.5">
+        <input type="range" id="freefallThresh" min="1.5" max="5.0" step="0.1" value="2.8">
       </div>
 
       <div class="setting-group">
         <div class="setting-label">
           <span>Landing Impact (m/s²)</span>
-          <span class="setting-value" id="landingThreshVal">12</span>
+          <span class="setting-value" id="landingThreshVal">9.0</span>
         </div>
-        <input type="range" id="landingThresh" min="6" max="25" step="0.5" value="12">
+        <input type="range" id="landingThresh" min="5" max="20" step="0.5" value="9.0">
       </div>
 
       <div class="setting-group">
@@ -585,9 +585,9 @@
 <script>
 (() => {
   const defaultSettings = {
-    minFlight: 0.18,
-    takeoffThresh: 4.5,
-    landingThresh: 12,
+    minFlight: 0.20,
+    freefallThresh: 2.8,      // |aig| below this = free-fall
+    landingThresh: 9.0,       // impact magnitude
     targetHeightCm: 40,
     haptic: true,
     sound: false,
@@ -599,17 +599,15 @@
   };
   let settings = { ...defaultSettings };
   try {
-    const saved = localStorage.getItem('vertipro_settings');
+    const saved = localStorage.getItem('vertipro_settings_v2');
     if (saved) settings = { ...defaultSettings, ...JSON.parse(saved) };
   } catch (e) {}
 
-  // Unit helpers
   function toDisplayHeight(cm) {
     return settings.heightUnit === 'in' ? cm / 2.54 : cm;
   }
   function formatHeight(cm, digits = 1) {
-    const v = toDisplayHeight(cm);
-    return settings.heightUnit === 'in' ? v.toFixed(1) : v.toFixed(1);
+    return toDisplayHeight(cm).toFixed(digits);
   }
   function toDisplayVel(ms) {
     return settings.velUnit === 'ft/s' ? ms * 3.28084 : ms;
@@ -628,22 +626,23 @@
   let isRecording = false;
   let permissionGranted = false;
   let gravity = { x: 0, y: 0, z: 9.81 };
-  let velocity = 0;          // vertical velocity (m/s), positive = up
+  let velocity = 0;               // vertical, positive = up
   let lastTimestamp = null;
   let lastAccel = 0;
   let stationarySamples = 0;
   const velHistory = [];
-  const HISTORY_LEN = 12;
+  const HISTORY_LEN = 10;
 
   // Jump state machine
-  let phase = 'idle';        // idle | concentric | flight | landing
+  let phase = 'idle';             // idle | push | flight | cooldown
   let flightStart = 0;
   let takeoffVelocity = 0;
   let peakVelInJump = 0;
-  let currentJump = null;
+  let freefallSamples = 0;
   let jumps = [];
   let lastLandingTime = 0;
-  const COOLDOWN_MS = 600;
+  const COOLDOWN_MS = 700;
+  const MAX_FLIGHT_MS = 950;      // hard safety (≈ 110 cm theoretical max)
 
   const chartData = [];
   const MAX_POINTS = 130;
@@ -651,7 +650,6 @@
 
   const $ = id => document.getElementById(id);
 
-  // ---------- Permission ----------
   function requestMotionPermission() {
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       DeviceMotionEvent.requestPermission()
@@ -669,11 +667,13 @@
     }
   }
 
-  // ---------- Sensor processing ----------
   function onMotion(e) {
     if (!e.accelerationIncludingGravity) return;
     const now = e.timeStamp || performance.now();
     const aig = e.accelerationIncludingGravity;
+
+    // Magnitude of total acceleration (including gravity) – key free-fall signal
+    const aigMag = Math.hypot(aig.x || 0, aig.y || 0, aig.z || 0);
 
     let linX = 0, linY = 0, linZ = 0;
     if (e.acceleration && e.acceleration.x !== null) {
@@ -681,7 +681,7 @@
       linY = e.acceleration.y || 0;
       linZ = e.acceleration.z || 0;
     } else {
-      const a = 0.90;
+      const a = 0.92;
       gravity.x = a * gravity.x + (1 - a) * (aig.x || 0);
       gravity.y = a * gravity.y + (1 - a) * (aig.y || 0);
       gravity.z = a * gravity.z + (1 - a) * (aig.z || 0);
@@ -690,29 +690,27 @@
       linZ = (aig.z || 0) - gravity.z;
     }
 
-    // Vertical component (opposite to gravity vector)
     const gMag = Math.hypot(gravity.x, gravity.y, gravity.z) || 9.81;
     const gx = gravity.x / gMag, gy = gravity.y / gMag, gz = gravity.z / gMag;
-    // Positive = upward acceleration relative to gravity
+    // Positive = upward
     const accel = -(linX * gx + linY * gy + linZ * gz);
+    const linMag = Math.hypot(linX, linY, linZ);
 
-    processSample(accel, now, Math.hypot(linX, linY, linZ));
+    processSample(accel, now, aigMag, linMag);
   }
 
-  function processSample(rawAccel, timestamp, totalLinAccel) {
+  function processSample(rawAccel, timestamp, aigMag, linMag) {
     if (!lastTimestamp) { lastTimestamp = timestamp; return; }
     let dt = (timestamp - lastTimestamp) / 1000;
-    if (dt <= 0 || dt > 0.06) dt = 0.016;
+    if (dt <= 0 || dt > 0.05) dt = 0.016;
     lastTimestamp = timestamp;
 
-    // Light smoothing
-    const accel = 0.55 * lastAccel + 0.45 * rawAccel;
+    const accel = 0.50 * lastAccel + 0.50 * rawAccel;
     lastAccel = accel;
 
-    // Integrate velocity (positive up)
     velocity += accel * dt;
 
-    // Zeroing when stationary
+    // Stationary zeroing
     velHistory.push(velocity);
     if (velHistory.length > HISTORY_LEN) velHistory.shift();
     let isFlat = false;
@@ -721,22 +719,18 @@
       let variance = 0;
       for (const v of velHistory) variance += (v - mean) * (v - mean);
       const std = Math.sqrt(variance / velHistory.length);
-      isFlat = std < 0.025;
+      isFlat = std < 0.022;
     }
-    const isStationary = (Math.abs(velocity) < 0.08 && Math.abs(accel) < 0.6) ||
-                         (isFlat && Math.abs(accel) < 0.8);
+    const isStationary = (Math.abs(velocity) < 0.07 && Math.abs(accel) < 0.55) ||
+                         (isFlat && Math.abs(accel) < 0.7);
     if (isStationary) {
       stationarySamples++;
-      if (stationarySamples >= 5) {
-        velocity *= 0.65;
-        if (Math.abs(velocity) < 0.03) velocity = 0;
+      if (stationarySamples >= 4) {
+        velocity *= 0.55;
+        if (Math.abs(velocity) < 0.025) velocity = 0;
       }
     } else stationarySamples = 0;
 
-    // Live velocity display helper
-    const absV = Math.abs(velocity);
-
-    // Chart
     chartData.push(velocity);
     if (chartData.length > MAX_POINTS) chartData.shift();
     drawChart();
@@ -746,130 +740,140 @@
       return;
     }
 
-    // ========== JUMP STATE MACHINE ==========
+    // ========== IMPROVED STATE MACHINE ==========
+    const inFreeFall = aigMag < settings.freefallThresh;
+
     if (phase === 'idle') {
-      // Detect strong upward acceleration (take-off impulse)
-      if (accel > settings.takeoffThresh && (timestamp - lastLandingTime > COOLDOWN_MS)) {
-        phase = 'concentric';
-        currentJump = {
-          startTime: timestamp,
-          peakAccel: accel,
-          takeoffVel: 0,
-          peakVel: 0
-        };
+      // Look for strong upward push
+      if (accel > 3.8 && velocity > 0.25 && (timestamp - lastLandingTime > COOLDOWN_MS)) {
+        phase = 'push';
+        takeoffVelocity = 0;
+        peakVelInJump = 0;
+        freefallSamples = 0;
         $('phaseLabel').textContent = 'Pushing…';
         $('statusPill').textContent = 'TAKE-OFF';
         $('statusPill').className = 'status-pill live';
       }
     }
-    else if (phase === 'concentric') {
-      if (velocity > currentJump.peakVel) currentJump.peakVel = velocity;
-      // Transition to flight when acceleration drops near free-fall
-      if (accel < 1.5 && velocity > 0.4) {
-        phase = 'flight';
-        flightStart = timestamp;
-        takeoffVelocity = Math.max(0.1, velocity);
-        peakVelInJump = takeoffVelocity;
-        currentJump.takeoffVel = takeoffVelocity;
-        $('phaseLabel').textContent = 'In flight…';
-        $('statusPill').textContent = 'FLIGHT';
-        $('statusPill').className = 'status-pill flight';
-        $('takeoffVel').textContent = formatVel(takeoffVelocity);
-      }
-      // Safety: if we never leave the ground, abort after 1.2 s
-      if (timestamp - currentJump.startTime > 1200) {
-        phase = 'idle';
-        currentJump = null;
-        forceZero();
-      }
-    }
-    else if (phase === 'flight') {
-      const flightMs = timestamp - flightStart;
-      $('flightTime').textContent = (flightMs / 1000).toFixed(2);
-
-      // Live height estimate from flight time so far (optimistic)
-      const liveH = 0.5 * 9.81 * Math.pow(flightMs / 2000, 2) * 100; // rough
-      $('liveHeight').textContent = formatHeight(liveH);
-
+    else if (phase === 'push') {
       if (velocity > peakVelInJump) peakVelInJump = velocity;
 
-      // Landing detection: large downward impact or high total linear accel
-      if (accel < -settings.landingThresh || totalLinAccel > settings.landingThresh * 1.4) {
-        const flightTime = (timestamp - flightStart) / 1000;
-        if (flightTime >= settings.minFlight) {
-          // Classic flight-time height formula (m → cm)
-          // h = (g * t²) / 8
-          const heightCm = (9.81 * flightTime * flightTime) / 8 * 100;
-
-          const mass = getMassKg();
-          // Approximate peak power (W) from take-off velocity
-          // P ≈ m * g * v_takeoff  (simplified) or better from energy
-          const peakPower = mass * 9.81 * takeoffVelocity * 1.15; // rough scaling
-          const meanPower = mass * 9.81 * (heightCm / 100) / (flightTime * 0.5);
-
-          const jump = {
-            number: jumps.length + 1,
-            height: heightCm,
-            flightTime,
-            takeoffVel: takeoffVelocity,
-            peakVel: peakVelInJump,
-            peakPower,
-            meanPower
-          };
-          jumps.push(jump);
-          onJumpComplete(jump);
+      // Enter flight when free-fall is sustained and we have upward velocity
+      if (inFreeFall) {
+        freefallSamples++;
+        if (freefallSamples >= 3 && velocity > 0.35) {
+          phase = 'flight';
+          flightStart = timestamp;
+          takeoffVelocity = Math.max(0.15, velocity);
+          peakVelInJump = Math.max(peakVelInJump, takeoffVelocity);
+          $('phaseLabel').textContent = 'In flight…';
+          $('statusPill').textContent = 'FLIGHT';
+          $('statusPill').className = 'status-pill flight';
+          $('takeoffVel').textContent = formatVel(takeoffVelocity);
         }
-        phase = 'landing';
-        lastLandingTime = timestamp;
-        $('phaseLabel').textContent = 'Landed';
-        setTimeout(() => {
-          if (phase === 'landing') {
-            phase = 'idle';
-            forceZero();
-            $('phaseLabel').textContent = isRecording ? 'Ready for next jump' : 'Stand still • Ready';
-            if (isRecording) {
-              $('statusPill').textContent = 'RECORDING';
-              $('statusPill').className = 'status-pill recording';
-            }
-          }
-        }, 350);
+      } else {
+        freefallSamples = 0;
       }
 
-      // Safety timeout (max reasonable flight ~1.1 s)
-      if (flightMs > 1100) {
+      // Abort if push lasts too long without leaving the ground
+      if (timestamp - lastLandingTime > 1400 && phase === 'push') {
         phase = 'idle';
-        currentJump = null;
         forceZero();
         $('phaseLabel').textContent = 'Ready for next jump';
       }
     }
+    else if (phase === 'flight') {
+      const flightMs = timestamp - flightStart;
+      const flightSec = flightMs / 1000;
+
+      // Live height estimate (as if you landed right now)
+      const liveH = (9.81 * flightSec * flightSec) / 8 * 100;
+      $('liveHeight').textContent = formatHeight(Math.min(liveH, 120));
+      $('flightTime').textContent = flightSec.toFixed(2);
+
+      if (velocity > peakVelInJump) peakVelInJump = velocity;
+
+      // Landing conditions (any one is enough)
+      const impact = aigMag > settings.landingThresh || linMag > settings.landingThresh * 0.9;
+      const leftFreeFall = !inFreeFall && velocity < -0.15 && flightMs > 180;
+
+      if ((impact || leftFreeFall) && flightSec >= settings.minFlight) {
+        finishJump(flightSec, timestamp);
+      }
+      // Hard safety timeout
+      else if (flightMs > MAX_FLIGHT_MS) {
+        finishJump(MAX_FLIGHT_MS / 1000, timestamp);
+      }
+    }
+    else if (phase === 'cooldown') {
+      // brief pause after landing
+    }
+  }
+
+  function finishJump(flightSec, timestamp) {
+    // Primary height from flight time
+    const heightCm = (9.81 * flightSec * flightSec) / 8 * 100;
+
+    // Secondary height from takeoff velocity (for comparison)
+    const heightFromVel = (takeoffVelocity * takeoffVelocity) / (2 * 9.81) * 100;
+
+    const mass = getMassKg();
+    // Simple peak power approximation
+    const peakPower = mass * 9.81 * takeoffVelocity * 1.1;
+
+    const jump = {
+      number: jumps.length + 1,
+      height: heightCm,
+      heightVel: heightFromVel,
+      flightTime: flightSec,
+      takeoffVel: takeoffVelocity,
+      peakVel: peakVelInJump,
+      peakPower
+    };
+    jumps.push(jump);
+    onJumpComplete(jump);
+
+    phase = 'cooldown';
+    lastLandingTime = timestamp;
+    $('phaseLabel').textContent = 'Landed';
+    forceZero();
+
+    setTimeout(() => {
+      if (phase === 'cooldown') {
+        phase = 'idle';
+        $('phaseLabel').textContent = isRecording ? 'Ready for next jump' : 'Stand still • Ready';
+        if (isRecording) {
+          $('statusPill').textContent = 'RECORDING';
+          $('statusPill').className = 'status-pill recording';
+        }
+      }
+    }, 400);
   }
 
   function onJumpComplete(jump) {
     updateUI();
-    if (settings.haptic && navigator.vibrate) navigator.vibrate([30, 40, 30]);
+    if (settings.haptic && navigator.vibrate) navigator.vibrate([25, 35, 25]);
     if (settings.sound) {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = 990;
+        osc.frequency.value = 920;
         gain.gain.value = 0.07;
         osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
-        osc.stop(ctx.currentTime + 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.13);
+        osc.stop(ctx.currentTime + 0.13);
       } catch (e) {}
     }
-    // Flash feedback
     if (settings.flashBelowTarget) {
       const hero = document.querySelector('.hero');
       if (jump.height < settings.targetHeightCm) {
         hero.style.borderColor = 'rgba(255,165,2,0.55)';
-        setTimeout(() => hero.style.borderColor = '', 700);
+        setTimeout(() => hero.style.borderColor = '', 650);
       } else {
         hero.style.borderColor = 'rgba(0,229,160,0.5)';
-        setTimeout(() => hero.style.borderColor = '', 700);
+        setTimeout(() => hero.style.borderColor = '', 650);
       }
     }
   }
@@ -877,9 +881,10 @@
   function forceZero() {
     velocity = 0;
     lastAccel = 0;
-    stationarySamples = 15;
+    stationarySamples = 12;
     velHistory.length = 0;
-    if (navigator.vibrate) navigator.vibrate(18);
+    freefallSamples = 0;
+    if (navigator.vibrate) navigator.vibrate(15);
   }
 
   function updateUI() {
@@ -909,7 +914,6 @@
     $('flightTime').textContent = last.flightTime.toFixed(2);
     $('takeoffVel').textContent = formatVel(last.takeoffVel);
 
-    // Consistency (1 - CV)
     const meanH = avg;
     let std = 0;
     heights.forEach(h => std += (h - meanH) ** 2);
@@ -919,7 +923,6 @@
 
     $('setInfo').textContent = `${jumps.length} jump${jumps.length > 1 ? 's' : ''} recorded`;
 
-    // Rebuild list
     const list = $('jumpsList');
     const header = list.querySelector('.header');
     list.innerHTML = '';
@@ -934,7 +937,7 @@
         <div class="mono">${j.flightTime.toFixed(2)}</div>
         <div class="mono">${formatVel(j.takeoffVel)}</div>
         <div class="mono">${Math.round(j.peakPower)}</div>
-        <div class="mono">${formatVel(j.peakVel)}</div>
+        <div class="mono">${formatHeight(j.heightVel)}</div>
         <button class="del-jump" data-idx="${realIndex}">×</button>
       `;
       list.appendChild(row);
@@ -962,7 +965,6 @@
     const h = canvas.height / devicePixelRatio;
     chartCtx.clearRect(0, 0, w, h);
 
-    // Zero line
     chartCtx.strokeStyle = '#1a1a1a';
     chartCtx.lineWidth = 1;
     chartCtx.beginPath();
@@ -971,7 +973,7 @@
     chartCtx.stroke();
 
     if (chartData.length < 2) return;
-    const maxAbs = Math.max(1.2, ...chartData.map(Math.abs));
+    const maxAbs = Math.max(1.4, ...chartData.map(Math.abs));
     const scale = (h * 0.38) / maxAbs;
 
     chartCtx.beginPath();
@@ -987,20 +989,18 @@
     chartCtx.stroke();
   }
 
-  // ---------- Controls ----------
+  // Controls
   $('enableMotionBtn').addEventListener('click', requestMotionPermission);
-
   $('zeroBtn').addEventListener('click', () => {
     forceZero();
     $('liveHeight').textContent = formatHeight(0);
   });
-
   $('calibrateBtn').addEventListener('click', () => {
     gravity = { x: 0, y: 0, z: 9.81 };
     forceZero();
     $('statusPill').textContent = 'CALIBRATED';
     $('statusPill').className = 'status-pill live';
-    if (navigator.vibrate) navigator.vibrate([18, 35, 18]);
+    if (navigator.vibrate) navigator.vibrate([15, 30, 15]);
   });
 
   $('recordBtn').addEventListener('click', () => {
@@ -1009,7 +1009,6 @@
     if (isRecording) {
       jumps = [];
       phase = 'idle';
-      currentJump = null;
       lastLandingTime = 0;
       forceZero();
       updateUI();
@@ -1032,7 +1031,6 @@
     isRecording = false;
     jumps = [];
     phase = 'idle';
-    currentJump = null;
     lastLandingTime = 0;
     forceZero();
     chartData.length = 0;
@@ -1053,16 +1051,16 @@
     updateUI();
   });
 
-  // ---------- Settings ----------
+  // Settings
   function openSettings() {
     $('massSlider').value = settings.massValue;
     $('massVal').textContent = settings.massValue + ' ' + settings.massUnit;
     $('minFlight').value = settings.minFlight;
     $('minFlightVal').textContent = settings.minFlight.toFixed(2);
-    $('takeoffThresh').value = settings.takeoffThresh;
-    $('takeoffThreshVal').textContent = settings.takeoffThresh.toFixed(1);
+    $('freefallThresh').value = settings.freefallThresh;
+    $('freefallVal').textContent = settings.freefallThresh.toFixed(1);
     $('landingThresh').value = settings.landingThresh;
-    $('landingThreshVal').textContent = settings.landingThresh;
+    $('landingThreshVal').textContent = settings.landingThresh.toFixed(1);
     $('targetHeight').value = settings.targetHeightCm;
     $('targetHeightVal').textContent = settings.targetHeightCm + ' cm';
     $('hapticToggle').classList.toggle('on', settings.haptic);
@@ -1096,8 +1094,8 @@
     $('massVal').textContent = e.target.value + ' ' + unit;
   });
   $('minFlight').addEventListener('input', e => $('minFlightVal').textContent = parseFloat(e.target.value).toFixed(2));
-  $('takeoffThresh').addEventListener('input', e => $('takeoffThreshVal').textContent = parseFloat(e.target.value).toFixed(1));
-  $('landingThresh').addEventListener('input', e => $('landingThreshVal').textContent = e.target.value);
+  $('freefallThresh').addEventListener('input', e => $('freefallVal').textContent = parseFloat(e.target.value).toFixed(1));
+  $('landingThresh').addEventListener('input', e => $('landingThreshVal').textContent = parseFloat(e.target.value).toFixed(1));
   $('targetHeight').addEventListener('input', e => $('targetHeightVal').textContent = e.target.value + ' cm');
 
   document.querySelectorAll('#heightUnitRow .unit-btn').forEach(btn => {
@@ -1126,7 +1124,7 @@
 
   $('saveSettings').addEventListener('click', () => {
     settings.minFlight = parseFloat($('minFlight').value);
-    settings.takeoffThresh = parseFloat($('takeoffThresh').value);
+    settings.freefallThresh = parseFloat($('freefallThresh').value);
     settings.landingThresh = parseFloat($('landingThresh').value);
     settings.targetHeightCm = parseInt($('targetHeight').value);
     settings.massValue = parseInt($('massSlider').value);
@@ -1141,14 +1139,13 @@
     if (activeV) settings.velUnit = activeV.dataset.unit;
     if (activeM) settings.massUnit = activeM.dataset.unit;
 
-    localStorage.setItem('vertipro_settings', JSON.stringify(settings));
+    localStorage.setItem('vertipro_settings_v2', JSON.stringify(settings));
     updateUnitLabels();
     updateUI();
     closeSettings();
-    if (navigator.vibrate) navigator.vibrate(28);
+    if (navigator.vibrate) navigator.vibrate(25);
   });
 
-  // Touch handling – allow scrolling on sheet & list
   document.body.addEventListener('touchmove', e => {
     if (e.target.closest('.sheet') || e.target.closest('.jumps-list') || e.target.closest('.sheet-content')) return;
     if (e.target.closest('.hero') || e.target.closest('.controls') || e.target.closest('.metrics')) {
